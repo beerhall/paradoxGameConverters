@@ -27,6 +27,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.*/
 #include "../Configuration.h"
 #include "Log.h"
 #include "Object.h"
+#include "OSCompatibilityLayer.h"
 #include "ParadoxParserUTF8.h"
 #include <fstream>
 using namespace std;
@@ -1656,8 +1657,7 @@ void HoI4FocusTree::addVersion1_0GenericFocusTree()
 	newFocus = new HoI4Focus;
 	newFocus->id = "ideological_fanaticism";
 	newFocus->icon = "GFX_goal_generic_demand_territory";
-	newFocus->prerequisites.push_back("focus = paramilitarism");
-	newFocus->prerequisites.push_back("focus = political_commissars");
+	newFocus->prerequisites.push_back("focus = paramilitarism focus = political_commissars");
 	newFocus->xPos = 17;
 	newFocus->yPos = 6;
 	newFocus->cost = 10;
@@ -1674,8 +1674,7 @@ void HoI4FocusTree::addVersion1_0GenericFocusTree()
 	newFocus = new HoI4Focus;
 	newFocus->id = "technology_sharing";
 	newFocus->icon = "GFX_goal_generic_scientific_exchange";
-	newFocus->prerequisites.push_back("focus = ideological_fanaticism");
-	newFocus->prerequisites.push_back("focus = why_we_fight");
+	newFocus->prerequisites.push_back("focus = ideological_fanaticism focus = why_we_fight");
 	newFocus->available += "			has_war = yes\n";
 	newFocus->available += "			is_in_faction = yes\n";
 	newFocus->available += "			OR = {\n";
@@ -2050,7 +2049,7 @@ void HoI4FocusTree::addVersion1_3GenericFocusTree()
 	newFocus->completionReward += "						}\n";
 	newFocus->completionReward += "					}\n";
 	newFocus->completionReward += "				}\n";
-	newFocus->completionReward += "				random_owned_controlooed_state = {\n";
+	newFocus->completionReward += "				random_owned_controlled_state = {\n";
 	newFocus->completionReward += "					limit = {\n";
 	newFocus->completionReward += "						free_building_slots = {\n";
 	newFocus->completionReward += "							building = air_base\n";
@@ -2469,18 +2468,9 @@ void HoI4FocusTree::addVersion1_3GenericFocusTree()
 	newFocus->aiWillDo += "				factor = 0\n";
 	newFocus->aiWillDo += "				date < 1939.1.1\n";
 	newFocus->aiWillDo += "				OR = {\n";
-	newFocus->aiWillDo += "					# we dont want chinese minors to go crazy on slots early since they get eaten\n";
-	newFocus->aiWillDo += "					tag = GXC\n";
-	newFocus->aiWillDo += "					tag = YUN\n";
-	newFocus->aiWillDo += "					tag = SHX\n";
-	newFocus->aiWillDo += "					tag = XSM\n";
-	newFocus->aiWillDo += "					tag = BEL\n";
-	newFocus->aiWillDo += "					tag = LUX\n";
-	newFocus->aiWillDo += "					tag = HOL\n";
-	newFocus->aiWillDo += "					tag = DEN\n";
 	newFocus->aiWillDo += "					# we also dont want tiny nations to go crazy with slots right away\n";
 	newFocus->aiWillDo += "					num_of_controlled_states < 2\n";
-	newFocus->aiWillDo += "				}				\n";
+	newFocus->aiWillDo += "				}\n";
 	newFocus->aiWillDo += "			}";
 	focuses.push_back(newFocus);
 
@@ -3378,8 +3368,7 @@ void HoI4FocusTree::addVersion1_3GenericFocusTree()
 	newFocus = new HoI4Focus;
 	newFocus->id = "ideological_fanaticism";
 	newFocus->icon = "GFX_goal_generic_demand_territory";
-	newFocus->prerequisites.push_back("focus = paramilitarism");
-	newFocus->prerequisites.push_back("focus = political_commissars");
+	newFocus->prerequisites.push_back("focus = paramilitarism focus = political_commissars");
 	newFocus->xPos = 17;
 	newFocus->yPos = 6;
 	newFocus->cost = 10;
@@ -3397,8 +3386,7 @@ void HoI4FocusTree::addVersion1_3GenericFocusTree()
 	newFocus = new HoI4Focus;
 	newFocus->id = "technology_sharing";
 	newFocus->icon = "GFX_goal_generic_scientific_exchange";
-	newFocus->prerequisites.push_back("focus = ideological_fanaticism");
-	newFocus->prerequisites.push_back("focus = why_we_fight");
+	newFocus->prerequisites.push_back("focus = ideological_fanaticism focus = why_we_fight");
 	newFocus->available += "			has_war = yes\n";
 	newFocus->available += "			is_in_faction = yes\n";
 	newFocus->available += "			OR = {\n";
@@ -4331,6 +4319,12 @@ void HoI4FocusTree::addMonarchyEmpireNationalFocuses(HoI4Country* Home, const ve
 
 void HoI4FocusTree::output()
 {
+	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/common/national_focus"))
+	{
+		LOG(LogLevel::Error) << "Could not create \"Output/" + Configuration::getOutputName() + "/common/national_focus\"";
+		exit(-1);
+	}
+
 	string filename("Output/" + Configuration::getOutputName() + "/common/national_focus/" + srcCountryTag + "_NF.txt");
 	ofstream out(filename);
 	if (!out.is_open())
@@ -4340,7 +4334,7 @@ void HoI4FocusTree::output()
 	}
 
 	out << "focus_tree = {\n";
-	out << "	id = german_focus\n";
+	out << "	id = " << dstCountryTag + "_focus\n";
 	out << "	\n";
 	out << "	country = {\n";
 	out << "		factor = 0\n";

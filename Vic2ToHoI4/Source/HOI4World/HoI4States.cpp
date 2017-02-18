@@ -1,4 +1,4 @@
-/*Copyright (c) 2016 The Paradox Game Converters Project
+/*Copyright (c) 2017 The Paradox Game Converters Project
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -26,6 +26,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.*/
 #include "OSCompatibilityLayer.h"
 #include "ParadoxParserUTF8.h"
 #include "../Mappers/CountryMapping.h"
+#include "../Mappers/ProvinceDefinitions.h"
 #include "../Mappers/V2Localisations.h"
 #include "../V2World/V2Country.h"
 #include "../V2World/V2World.h"
@@ -42,7 +43,6 @@ void HoI4States::importStates(map<int, vector<int>>& defaultStateToProvinceMap)
 	for (auto stateFile: statesFiles)
 	{
 		int num = stoi(stateFile.substr(0, stateFile.find_first_of('-')));
-		stateFilenames.insert(make_pair(num, stateFile));
 
 		// create the default state map
 		Object* fileObj = parser_UTF8::doParseFile(Configuration::getHoI4Path() + "/history/states/" + stateFile);
@@ -65,48 +65,6 @@ void HoI4States::importStates(map<int, vector<int>>& defaultStateToProvinceMap)
 }
 
 
-void HoI4States::recordAllLandProvinces()
-{
-	ifstream definitions(Configuration::getHoI4Path() + "/map/definition.csv");
-	if (!definitions.is_open())
-	{
-		LOG(LogLevel::Error) << "Could not open " << Configuration::getHoI4Path() << "/map/definition.csv";
-		exit(-1);
-	}
-
-	while (true)
-	{
-		string line;
-		getline(definitions, line);
-		int pos = line.find_first_of(';');
-		if (pos == string::npos)
-		{
-			break;
-		}
-		int provNum = stoi(line.substr(0, pos));
-		if (provNum == 0)
-		{
-			continue;
-		}
-
-		line = line.substr(pos + 1, line.length());
-		int pos2 = line.find_first_of(';');
-		line = line.substr(pos2 + 1, line.length());
-		int pos3 = line.find_first_of(';');
-		line = line.substr(pos3 + 1, line.length());
-		int pos4 = line.find_first_of(';');
-		line = line.substr(pos4 + 1, line.length());
-		int pos5 = line.find_first_of(';');
-		line = line.substr(0, pos5);
-
-		if (line == "land")
-		{
-			landProvinces.insert(provNum);
-		}
-	}
-}
-
-
 void HoI4States::convertStates()
 {
 	LOG(LogLevel::Info) << "Converting states";
@@ -119,7 +77,7 @@ map<int, ownersAndCores> HoI4States::determineProvinceOwners()
 {
 	const map<string, V2Country*> V2Countries = sourceWorld->getCountries();
 	map<int, ownersAndCores> ownersAndCoresMap;
-	for (auto provItr: landProvinces)
+	for (auto provItr: provinceDefinitions::getLandProvinces())
 	{
 		HoI4ToVic2ProvinceMapping::const_iterator provinceLink;
 		if (!getAppropriateMapping(provItr, provinceLink))
@@ -472,34 +430,19 @@ void HoI4States::output() const
 
 void HoI4States::outputHistory() const
 {
-	string statesPath = "Output/" + Configuration::getOutputName() + "/history/states";
-	if (!Utils::TryCreateFolder(statesPath))
+	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/history"))
+	{
+		LOG(LogLevel::Error) << "Could not create \"Output/" + Configuration::getOutputName() + "/history";
+		exit(-1);
+	}
+	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/history/states"))
 	{
 		LOG(LogLevel::Error) << "Could not create \"Output/" + Configuration::getOutputName() + "/history/states";
 		exit(-1);
 	}
 	for (auto state: states)
 	{
-		string filename;
-		auto nameItr = stateFilenames.find(state.first);
-		if (nameItr == stateFilenames.end())
-		{
-			filename = to_string(state.first) + "-convertedState.txt";
-		}
-		else
-		{
-			filename = nameItr->second;
-		}
-		state.second->output(filename);
-	}
-	for (auto nameItr = stateFilenames.find(states.size() + 1); nameItr != stateFilenames.end(); nameItr++)
-	{
-		ofstream emptyStateFile("Output/" + Configuration::getOutputName() + "/history/states/" + nameItr->second);
-		if (!emptyStateFile.is_open())
-		{
-			LOG(LogLevel::Warning) << "Could not create " << "Output/" << Configuration::getOutputName() << "/history/states/" << nameItr->second;
-		}
-		emptyStateFile.close();
+		state.second->output(to_string(state.first) + ".txt");
 	}
 }
 
