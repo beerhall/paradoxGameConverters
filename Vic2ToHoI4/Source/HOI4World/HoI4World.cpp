@@ -67,7 +67,6 @@ HoI4World::HoI4World(const V2World* _sourceWorld)
 	convertStrategicRegions();
 	convertDiplomacy();
 	convertTechs();
-	generateLeaders();
 	convertArmies();
 	convertNavies();
 	convertAirforces();
@@ -83,6 +82,17 @@ HoI4World::HoI4World(const V2World* _sourceWorld)
 	warCreator.generateWars(this);
 }
 
+
+HoI4Country * HoI4World::findCountry(string countryTag)
+{
+	auto country = countries.find(countryTag);
+	if (country == countries.end())
+	{
+		return nullptr;
+	}
+
+	return country->second;
+}
 
 void HoI4World::convertNavalBases()
 {
@@ -100,7 +110,6 @@ void HoI4World::convertCountries()
 	//initLeaderTraitsMap(leaderTraits);
 	governmentJobsMap governmentJobs;
 	//initGovernmentJobTypes(governmentJobs);
-	cultureMapping cultureMap = initCultureMap();
 
 	personalityMap landPersonalityMap;
 	personalityMap seaPersonalityMap;
@@ -116,14 +125,14 @@ void HoI4World::convertCountries()
 
 	for (auto sourceItr : sourceWorld->getCountries())
 	{
-		convertCountry(sourceItr, leaderMap, governmentJobs, cultureMap, landPersonalityMap, seaPersonalityMap, landBackgroundMap, seaBackgroundMap);
+		convertCountry(sourceItr, leaderMap, governmentJobs, landPersonalityMap, seaPersonalityMap, landBackgroundMap, seaBackgroundMap);
 	}
 
 	HoI4Localisation::addNonenglishCountryLocalisations();
 }
 
 
-void HoI4World::convertCountry(pair<string, V2Country*> country, map<int, int>& leaderMap, governmentJobsMap governmentJobs, const cultureMapping& cultureMap, personalityMap& landPersonalityMap, personalityMap& seaPersonalityMap, backgroundMap& landBackgroundMap, backgroundMap& seaBackgroundMap)
+void HoI4World::convertCountry(pair<string, V2Country*> country, map<int, int>& leaderMap, governmentJobsMap governmentJobs, personalityMap& landPersonalityMap, personalityMap& seaPersonalityMap, backgroundMap& landBackgroundMap, backgroundMap& seaBackgroundMap)
 {
 	// don't convert rebels
 	if (country.first == "REB")
@@ -135,16 +144,28 @@ void HoI4World::convertCountry(pair<string, V2Country*> country, map<int, int>& 
 	const std::string& HoI4Tag = CountryMapper::getHoI4Tag(country.first);
 	if (!HoI4Tag.empty())
 	{
-		std::string countryFileName = country.second->getName("english") + ".txt";
-		destCountry = new HoI4Country(HoI4Tag, countryFileName, this);
-		V2Party* rulingParty = country.second->getRulingParty(sourceWorld->getParties());
-		if (rulingParty == nullptr)
+		std::string countryFileName = Utils::convert8859_15ToUTF8(country.second->getName("english")) + ".txt";
+		int pipe = countryFileName.find_first_of('|');
+		while (pipe != string::npos)
 		{
-			LOG(LogLevel::Error) << "Could not find the ruling party for " << country.first << ". Most likely a mod was not included.";
-			LOG(LogLevel::Error) << "Double-check your settings, and remember to included EU4 to Vic2 mods. See the FAQ for more information.";
-			exit(-1);
+			countryFileName.replace(pipe, 1, "");
+			pipe = countryFileName.find_first_of('|');
 		}
-		destCountry->initFromV2Country(*sourceWorld, country.second, rulingParty->ideology, leaderMap, governmentJobs, portraitMap, cultureMap, landPersonalityMap, seaPersonalityMap, landBackgroundMap, seaBackgroundMap, states->getProvinceToStateIDMap(), states->getStates());
+		int greater = countryFileName.find_first_of('>');
+		while (greater != string::npos)
+		{
+			countryFileName.replace(greater, 1, "");
+			greater = countryFileName.find_first_of('>');
+		}
+		int lesser = countryFileName.find_first_of('<');
+		while (lesser != string::npos)
+		{
+			countryFileName.replace(lesser, 1, "");
+			lesser = countryFileName.find_first_of('>');
+		}
+		destCountry = new HoI4Country(HoI4Tag, countryFileName, this);
+
+		destCountry->initFromV2Country(*sourceWorld, country.second, states->getProvinceToStateIDMap(), states->getStates());
 		countries.insert(make_pair(HoI4Tag, destCountry));
 	}
 	else
@@ -315,7 +336,13 @@ double HoI4World::getWorldwideWorkerFactoryRatio(map<string, double> workersInCo
 		baseIndustry += countryWorkers.second * 0.000019;
 	}
 
-	double deltaIndustry = baseIndustry - (1189 - landedCountries.size());
+	int defaultFactories = 1189;
+	HOI4Version onePointFour("1.4.0");
+	if (Configuration::getHOI4Version() >= onePointFour)
+	{
+		defaultFactories = 1201;
+	}
+	double deltaIndustry = baseIndustry - (defaultFactories - landedCountries.size());
 	double newIndustry = baseIndustry - Configuration::getIcFactor() * deltaIndustry;
 	double acutalWorkerFactoryRatio = newIndustry / totalWorldWorkers;
 
@@ -693,6 +720,12 @@ void HoI4World::convertAgreements()
 			HoI4Country1->second->editAllies().insert(HoI4Tag2);
 			HoI4Country2->second->editAllies().insert(HoI4Tag1);
 		}
+
+		if (agreement->type == "vassal")
+		{
+			HoI4Country1->second->addPuppet(HoI4Tag2);
+			HoI4Country2->second->setPuppetmaster(HoI4Tag1);
+		}
 	}
 }
 
@@ -806,17 +839,6 @@ void HoI4World::addTechs(HoI4Country* country, const string& oldTech, const map<
 		{
 			country->setTechnology(HoI4TechItr.first, HoI4TechItr.second);
 		}
-	}
-}
-
-
-void HoI4World::generateLeaders()
-{
-	LOG(LogLevel::Info) << "Generating Leaders";
-
-	for (auto country: countries)
-	{
-		country.second->generateLeaders(leaderTraits, portraitMap);
 	}
 }
 
@@ -987,7 +1009,7 @@ void HoI4World::createFactions()
 	ofstream factionsLog("factions-logs.csv");
 	factionsLog << "name,government,initial strength,factory strength per year,factory strength by 1939\n";
 
-	for (auto leader: greatPowers)
+	for (auto leader : greatPowers)
 	{
 		if (leader->isInFaction())
 		{
@@ -1002,15 +1024,19 @@ void HoI4World::createFactions()
 		logFactionMember(factionsLog, leader);
 		double factionMilStrength = leader->getStrengthOverTime(3.0);
 
-		for (auto allyTag: leader->getAllies())
+		std::set<std::string> alliesAndPuppets = leader->getAllies();
+		for (auto puppetTag : leader->getPuppets())
 		{
-			auto ally = countries.find(allyTag);
-			if (ally == countries.end())
+			alliesAndPuppets.insert(puppetTag);
+		}
+
+		for (auto allyTag : alliesAndPuppets)
+		{
+			HoI4Country* allycountry = findCountry(allyTag);
+			if (!allycountry)
 			{
 				continue;
 			}
-
-			HoI4Country* allycountry = ally->second;
 			string allygovernment = allycountry->getGovernmentIdeology();
 			string sphereLeader = returnSphereLeader(allycountry);
 
@@ -1020,17 +1046,33 @@ void HoI4World::createFactions()
 				factionMembers.push_back(allycountry);
 
 				factionMilStrength += allycountry->getStrengthOverTime(1.0);
+				//also add the allies' puppets to the faction
+				for (auto puppetTag : allycountry->getPuppets())
+				{
+					HoI4Country* puppetcountry = findCountry(puppetTag);
+					if (!puppetcountry)
+					{
+						continue;
+					}
+					logFactionMember(factionsLog, puppetcountry);
+					factionMembers.push_back(puppetcountry);
+
+					factionMilStrength += puppetcountry->getStrengthOverTime(1.0);
+				}
 			}
 		}
 
-		HoI4Faction* newFaction = new HoI4Faction(leader, factionMembers);
-		for (auto member: factionMembers)
+		if (factionMembers.size() > 1)
 		{
-			member->setFaction(newFaction);
-		}
-		factions.push_back(newFaction);
+			HoI4Faction* newFaction = new HoI4Faction(leader, factionMembers);
+			for (auto member : factionMembers)
+			{
+				member->setFaction(newFaction);
+			}
+			factions.push_back(newFaction);
 
-		factionsLog << "Faction Strength in 1939," << factionMilStrength << "\n";
+			factionsLog << "Faction Strength in 1939," << factionMilStrength << "\n";
+		}
 	}
 
 	factionsLog.close();
@@ -1100,9 +1142,9 @@ void HoI4World::output() const
 {
 	LOG(LogLevel::Info) << "Outputting world";
 
-	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/history"))
+	if (!Utils::TryCreateFolder("output/" + Configuration::getOutputName() + "/history"))
 	{
-		LOG(LogLevel::Error) << "Could not create \"Output/" + Configuration::getOutputName() + "/history";
+		LOG(LogLevel::Error) << "Could not create \"output/" + Configuration::getOutputName() + "/history";
 		exit(-1);
 	}
 
@@ -1123,14 +1165,14 @@ void HoI4World::output() const
 
 void HoI4World::outputCommonCountries() const
 {
-	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/common/country_tags"))
+	if (!Utils::TryCreateFolder("output/" + Configuration::getOutputName() + "/common/country_tags"))
 	{
-		LOG(LogLevel::Error) << "Could not create \"Output/" + Configuration::getOutputName() + "/common/country_tags\"";
+		LOG(LogLevel::Error) << "Could not create \"output/" + Configuration::getOutputName() + "/common/country_tags\"";
 		exit(-1);
 	}
 
 	LOG(LogLevel::Debug) << "Writing countries file";
-	ofstream allCountriesFile("Output/" + Configuration::getOutputName() + "/common/country_tags/00_countries.txt");
+	ofstream allCountriesFile("output/" + Configuration::getOutputName() + "/common/country_tags/00_countries.txt");
 	if (!allCountriesFile.is_open())
 	{
 		LOG(LogLevel::Error) << "Could not create countries file";
@@ -1152,16 +1194,16 @@ void HoI4World::outputCommonCountries() const
 
 void HoI4World::outputColorsfile() const
 {
-	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/common/countries"))
+	if (!Utils::TryCreateFolder("output/" + Configuration::getOutputName() + "/common/countries"))
 	{
-		LOG(LogLevel::Error) << "Could not create \"Output/" + Configuration::getOutputName() + "/common/countries\"";
+		LOG(LogLevel::Error) << "Could not create \"output/" + Configuration::getOutputName() + "/common/countries\"";
 		exit(-1);
 	}
 
-	ofstream output("Output/" + Configuration::getOutputName() + "/common/countries/colors.txt");
+	ofstream output("output/" + Configuration::getOutputName() + "/common/countries/colors.txt");
 	if (!output.is_open())
 	{
-		Log(LogLevel::Error) << "Could not open Output/" << Configuration::getOutputName() << "/common/countries/colors.txt";
+		Log(LogLevel::Error) << "Could not open output/" << Configuration::getOutputName() << "/common/countries/colors.txt";
 		exit(-1);
 	}
 
@@ -1180,12 +1222,12 @@ void HoI4World::outputColorsfile() const
 
 void HoI4World::outputNames() const
 {
-	ofstream namesFile("Output/" + Configuration::getOutputName() + "/common/names/01_names.txt");
+	ofstream namesFile("output/" + Configuration::getOutputName() + "/common/names/01_names.txt");
 	namesFile << "\xEF\xBB\xBF";    // add the BOM to make HoI4 happy
 
 	if (!namesFile.is_open())
 	{
-		Log(LogLevel::Error) << "Could not open Output/" << Configuration::getOutputName() << "/common/names/01_names.txt";
+		Log(LogLevel::Error) << "Could not open output/" << Configuration::getOutputName() << "/common/names/01_names.txt";
 		exit(-1);
 	}
 
@@ -1200,16 +1242,16 @@ void HoI4World::outputMap() const
 {
 	LOG(LogLevel::Debug) << "Writing Map Info";
 
-	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/map"))
+	if (!Utils::TryCreateFolder("output/" + Configuration::getOutputName() + "/map"))
 	{
-		LOG(LogLevel::Error) << "Could not create \"Output/" + Configuration::getOutputName() + "/map";
+		LOG(LogLevel::Error) << "Could not create \"output/" + Configuration::getOutputName() + "/map";
 		exit(-1);
 	}
 
-	ofstream rocketSitesFile("Output/" + Configuration::getOutputName() + "/map/rocketsites.txt");
+	ofstream rocketSitesFile("output/" + Configuration::getOutputName() + "/map/rocketsites.txt");
 	if (!rocketSitesFile.is_open())
 	{
-		LOG(LogLevel::Error) << "Could not create Output/" << Configuration::getOutputName() << "/map/rocketsites.txt";
+		LOG(LogLevel::Error) << "Could not create output/" << Configuration::getOutputName() << "/map/rocketsites.txt";
 		exit(-1);
 	}
 	for (auto state: states->getStates())
@@ -1219,10 +1261,10 @@ void HoI4World::outputMap() const
 	}
 	rocketSitesFile.close();
 
-	ofstream airportsFile("Output/" + Configuration::getOutputName() + "/map/airports.txt");
+	ofstream airportsFile("output/" + Configuration::getOutputName() + "/map/airports.txt");
 	if (!airportsFile.is_open())
 	{
-		LOG(LogLevel::Error) << "Could not create Output/" << Configuration::getOutputName() << "/map/airports.txt";
+		LOG(LogLevel::Error) << "Could not create output/" << Configuration::getOutputName() << "/map/airports.txt";
 		exit(-1);
 	}
 	for (auto state: states->getStates())
@@ -1232,14 +1274,14 @@ void HoI4World::outputMap() const
 	}
 	airportsFile.close();
 
-	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/map/strategicregions"))
+	if (!Utils::TryCreateFolder("output/" + Configuration::getOutputName() + "/map/strategicregions"))
 	{
-		LOG(LogLevel::Error) << "Could not create \"Output/" + Configuration::getOutputName() + "/map/strategicregions";
+		LOG(LogLevel::Error) << "Could not create \"output/" + Configuration::getOutputName() + "/map/strategicregions";
 		exit(-1);
 	}
 	for (auto strategicRegion: strategicRegions)
 	{
-		strategicRegion.second->output("Output/" + Configuration::getOutputName() + "/map/strategicregions/");
+		strategicRegion.second->output("output/" + Configuration::getOutputName() + "/map/strategicregions/");
 	}
 }
 
@@ -1247,36 +1289,36 @@ void HoI4World::outputMap() const
 void HoI4World::outputCountries() const
 {
 	LOG(LogLevel::Debug) << "Writing countries";
-	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/history"))
+	if (!Utils::TryCreateFolder("output/" + Configuration::getOutputName() + "/history"))
 	{
-		LOG(LogLevel::Error) << "Could not create \"Output/" + Configuration::getOutputName() + "/history";
+		LOG(LogLevel::Error) << "Could not create \"output/" + Configuration::getOutputName() + "/history";
 		exit(-1);
 	}
-	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/history/countries"))
+	if (!Utils::TryCreateFolder("output/" + Configuration::getOutputName() + "/history/countries"))
 	{
-		LOG(LogLevel::Error) << "Could not create \"Output/" + Configuration::getOutputName() + "/history";
+		LOG(LogLevel::Error) << "Could not create \"output/" + Configuration::getOutputName() + "/history";
 		exit(-1);
 	}
-	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/history/states"))
+	if (!Utils::TryCreateFolder("output/" + Configuration::getOutputName() + "/history/states"))
 	{
-		LOG(LogLevel::Error) << "Could not create \"Output/" + Configuration::getOutputName() + "/history/states";
+		LOG(LogLevel::Error) << "Could not create \"output/" + Configuration::getOutputName() + "/history/states";
 		exit(-1);
 	}
-	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/history/units"))
+	if (!Utils::TryCreateFolder("output/" + Configuration::getOutputName() + "/history/units"))
 	{
-		LOG(LogLevel::Error) << "Could not create \"Output/" + Configuration::getOutputName() + "/history/units";
+		LOG(LogLevel::Error) << "Could not create \"output/" + Configuration::getOutputName() + "/history/units";
 		exit(-1);
 	}
 
 	for (auto country: countries)
 	{
-		country.second->output(states->getStates(), factions);
+		country.second->output();
 	}
 
-	ofstream ideasFile("Output/" + Configuration::getOutputName() + "/interface/converter_ideas.gfx");
+	ofstream ideasFile("output/" + Configuration::getOutputName() + "/interface/converter_ideas.gfx");
 	if (!ideasFile.is_open())
 	{
-		LOG(LogLevel::Error) << "Could not open Output/" << Configuration::getOutputName() << "/interface/ideas.gfx";
+		LOG(LogLevel::Error) << "Could not open output/" << Configuration::getOutputName() << "/interface/ideas.gfx";
 		exit(-1);
 	}
 
@@ -1292,13 +1334,13 @@ void HoI4World::outputCountries() const
 
 void HoI4World::outputRelations() const
 {
-	if (!Utils::TryCreateFolder("Output/" + Configuration::getOutputName() + "/common/opinion_modifiers"))
+	if (!Utils::TryCreateFolder("output/" + Configuration::getOutputName() + "/common/opinion_modifiers"))
 	{
-		Log(LogLevel::Error) << "Could not create Output/" + Configuration::getOutputName() + "/common/opinion_modifiers/";
+		Log(LogLevel::Error) << "Could not create output/" + Configuration::getOutputName() + "/common/opinion_modifiers/";
 		exit(-1);
 	}
 
-	ofstream out("Output/" + Configuration::getOutputName() + "/common/opinion_modifiers/01_opinion_modifiers.txt");
+	ofstream out("output/" + Configuration::getOutputName() + "/common/opinion_modifiers/01_opinion_modifiers.txt");
 	if (!out.is_open())
 	{
 		LOG(LogLevel::Error) << "Could not create 01_opinion_modifiers.txt.";
