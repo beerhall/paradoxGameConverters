@@ -1,4 +1,4 @@
-/*Copyright (c) 2016 The Paradox Game Converters Project
+/*Copyright (c) 2017 The Paradox Game Converters Project
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,7 +23,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.*/
 
 #include "../Configuration.h"
 #include "HoI4StrategicRegion.h"
-#include "log.h"
+#include "Log.h"
 #include "ParadoxParserUTF8.h"
 #include <fstream>
 using namespace std;
@@ -34,13 +34,13 @@ HoI4StrategicRegion::HoI4StrategicRegion(string _filename)
 {
 	filename = _filename;
 
-	Object* fileObj				= parser_UTF8::doParseFile(Configuration::getHoI4Path() + "/map/strategicregions/" + filename);
-	vector<Object*> regionObjs	= fileObj->getValue("strategic_region");
+	shared_ptr<Object> fileObj				= parser_UTF8::doParseFile(Configuration::getHoI4Path() + "/map/strategicregions/" + filename);
+	vector<shared_ptr<Object>> regionObjs	= fileObj->getValue("strategic_region");
 
-	vector<Object*> IDObjs = regionObjs[0]->getValue("id");
+	vector<shared_ptr<Object>> IDObjs = regionObjs[0]->getValue("id");
 	ID = stoi(IDObjs[0]->getLeaf());
 
-	vector<Object*>	provincesObjs		= regionObjs[0]->getValue("provinces");
+	vector<shared_ptr<Object>>	provincesObjs		= regionObjs[0]->getValue("provinces");
 	vector<string>		provinceStrings	= provincesObjs[0]->getTokens();
 	for (auto provinceString: provinceStrings)
 	{

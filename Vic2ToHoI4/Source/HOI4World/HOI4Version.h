@@ -1,4 +1,4 @@
-/*Copyright (c) 2016 The Paradox Game Converters Project
+/*Copyright (c) 2017 The Paradox Game Converters Project
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -36,7 +36,7 @@ class HOI4Version
 {
 public:
 	HOI4Version();
-	HOI4Version(Object* obj);
+	HOI4Version(shared_ptr<Object> obj);
 	HOI4Version(string version);
 	bool operator >= (HOI4Version& rhs) const;
 
@@ -49,4 +49,4 @@ private:
 
 
 
-#endif HOI4VERSION_H_
+#endif // HOI4VERSION_H_

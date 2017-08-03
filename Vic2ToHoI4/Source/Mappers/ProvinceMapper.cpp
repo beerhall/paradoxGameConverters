@@ -1,4 +1,4 @@
-/*Copyright (c) 2016 The Paradox Game Converters Project
+/*Copyright (c) 2017 The Paradox Game Converters Project
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,8 +23,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.*/
 
 #include "ProvinceMapper.h"
 #include <fstream>
-#include "log.h"
-#include "..\Configuration.h"
+#include "Log.h"
+#include "../Configuration.h"
 #include "Object.h"
 #include "ParadoxParser8859_15.h"
 
@@ -38,7 +38,7 @@ provinceMapper* provinceMapper::instance = NULL;
 provinceMapper::provinceMapper()
 {
 	LOG(LogLevel::Info) << "Parsing province mappings";
-	Object* parsedMappingsFile = parser_8859_15::doParseFile("province_mappings.txt");
+	shared_ptr<Object> parsedMappingsFile = parser_8859_15::doParseFile("province_mappings.txt");
 	if (parsedMappingsFile == NULL)
 	{
 		LOG(LogLevel::Error) << "Could not parse file province_mappings.txt";
@@ -50,22 +50,22 @@ provinceMapper::provinceMapper()
 
 
 
-void provinceMapper::initProvinceMap(Object* parsedMappingsFile)
+void provinceMapper::initProvinceMap(shared_ptr<Object> parsedMappingsFile)
 {
-	vector<Object*> versions = parsedMappingsFile->getLeaves();
+	vector<shared_ptr<Object>> versions = parsedMappingsFile->getLeaves();
 	if (versions.size() < 1)
 	{
 		LOG(LogLevel::Error) << "No province mapping definitions loaded";
 		exit(-1);
 	}
 
-	vector<Object*> mappings = getCorrectMappingVersion(versions);
+	vector<shared_ptr<Object>> mappings = getCorrectMappingVersion(versions);
 	processMappings(mappings);
 	checkAllHoI4ProvinesMapped();
 }
 
 
-void provinceMapper::processMappings(const vector<Object*>& mappings)
+void provinceMapper::processMappings(const vector<shared_ptr<Object>>& mappings)
 {
 	for (auto mapping: mappings)
 	{
@@ -180,11 +180,12 @@ void provinceMapper::verifyProvinceIsMapped(int provNum)
 }
 
 
-vector<Object*> provinceMapper::getCorrectMappingVersion(const vector<Object*>& versions)
+vector<shared_ptr<Object>> provinceMapper::getCorrectMappingVersion(const vector<shared_ptr<Object>>& versions)
 {
 	for (auto version: versions)
 	{
-		if (Configuration::getHOI4Version() >= HOI4Version(version->getKey()))
+		HOI4Version currentVersion(version->getKey());
+		if (Configuration::getHOI4Version() >= currentVersion)
 		{
 			LOG(LogLevel::Debug) << "Using version " << version->getKey() << " mappings";
 			return version->getLeaves();
