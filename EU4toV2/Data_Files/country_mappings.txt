@@ -1,4 +1,4 @@
-# Copyright (c) 2017 The Paradox Game Converters Project
+# Copyright (c) 2018 The Paradox Game Converters Project
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -128,8 +128,8 @@ link = { eu4 = LEI v2 = LEI } # Leinster
 link = { eu4 = c_leinster v2 = LEI } # Leinster
 link = { eu4 = IRE v2 = IRE } # Ireland
 link = { eu4 = k_ireland v2 = IRE } # Ireland
-link = { eu4 = MNS v2 = MNS } # Munster (Ireland)
-link = { eu4 = d_munster v2 = MUN } # Munster (Ireland)
+link = { eu4 = MNS v2 = MNS } # Thomond/Munster (Ireland)
+#link = { eu4 = d_munster v2 = MUN } # Munster (Ireland)
 link = { eu4 = SCO v2 = SCO } # Scotland
 link = { eu4 = k_scotland v2 = SCO } # Scotland
 link = { eu4 = TYR v2 = TYR } # Tyrone
@@ -292,8 +292,8 @@ link = { eu4 = MEI v2 = MEI } # Meissen
 link = { eu4 = d_meissen v2 = MEI } # Meissen
 link = { eu4 = MKL v2 = MEC } # Mecklenburg
 link = { eu4 = d_mecklenburg v2 = MEC } # Mecklenburg
-link = { eu4 = MUN v2 = MUN } # Munster (Germany)
-link = { eu4 = c_munster v2 = MUN } # Munster (Germany)
+link = { eu4 = MUN v2 = MUN } # Münster (Germany)
+link = { eu4 = c_munster v2 = MUN } # Münster (Germany)
 link = { eu4 = MVA v2 = MRV } # Moravia
 link = { eu4 = k_moravia v2 = MRV } # Moravia
 link = { eu4 = OLD v2 = OLD } # Oldenburg
@@ -353,7 +353,8 @@ link = { eu4 = e_spain v2 = SPA } # Spain
 link = { eu4 = GAL v2 = GAL } # Galicia
 link = { eu4 = k_spanish_galicia v2 = GAL } # Galicia
 #link = { eu4 = LON v2 = XXX } # Leon => k_leon
-#link = { eu4 = ADU v2 = XXX } # Andalusia => k_andalusia
+link = { eu4 = ADU v2 = ADU } # Andalusia
+link = { eu4 = k_andalusia v2 = ADU } # Andalusia
 
 #Italy
 link = { eu4 = AQU v2 = AQU } # Aquileia
@@ -1163,6 +1164,8 @@ link = { eu4 = ZOM v2 = ZOM } #Zombies
 
 ##Macedonian culture added (just in case)
 link = { eu4 = MKD v2 = MKD } #Macedonia
+##Alaska
+link = { eu4 = LSK v2 = LSK } #Alaska
 
 ##M&T basic mappings (only those whose tags already exist)
 link = { eu4 = AAA v2 = AAA } #Dummy
