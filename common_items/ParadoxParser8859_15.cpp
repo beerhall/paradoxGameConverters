@@ -1,4 +1,4 @@
-/*Copyright (c) 2016 The Paradox Game Converters Project
+/*Copyright (c) 2017 The Paradox Game Converters Project
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -54,6 +54,8 @@ using namespace boost::spirit;
 
 namespace parser_8859_15
 {
+	void clearStack();
+
 	static void setLHS(wstring key);
 	static void pushObj();
 	static void setRHSleaf(wstring val);
@@ -63,9 +65,9 @@ namespace parser_8859_15
 	static void setEpsilon();
 	static void setAssign();
 
-	static Object*		topLevel = nullptr;  // a top level object
-	vector<Object*>	stack;						// a stack of objects
-	vector<Object*>	objstack;					// a stack of objects
+	static shared_ptr<Object> topLevel;  // a top level object
+	vector<shared_ptr<Object>>	stack;						// a stack of objects
+	vector<shared_ptr<Object>>	objstack;					// a stack of objects
 	bool					epsilon = false;		// if we've tried an episilon for an assign
 	bool					inObjList = false;		// if we're inside an object list
 
@@ -84,8 +86,6 @@ namespace parser_8859_15
 	template <typename Iterator>
 	struct Parser : public qi::grammar<Iterator, SkipComment<Iterator> >
 	{
-		static Object* topLevel;
-
 		// leaf: either left or right side of assignment.  unquoted keyword.
 		// example: leaf
 		qi::rule<Iterator, wstring(), SkipComment<Iterator> >	leaf;
@@ -175,14 +175,10 @@ namespace parser_8859_15
 		}
 	};
 
-	Object* getTopLevel()
-	{
-		return topLevel;
-	}
 
 	void initParser()
 	{
-		topLevel = new Object("topLevel");
+		topLevel = make_shared<Object>("topLevel");
 		epsilon = false;
 	}
 
@@ -190,7 +186,7 @@ namespace parser_8859_15
 	{
 		int openBraces = 0;				// the number of braces deep we are
 		wstring currObject;				// the current object being built
-		bool topLevel = true;			// whether or not we're at the top level
+		bool isTopLevel = true;			// whether or not we're at the top level
 		while (read.good())
 		{
 			string buffer;
@@ -248,7 +244,7 @@ namespace parser_8859_15
 
 			if (openBraces > 0)
 			{
-				topLevel = false;
+				isTopLevel = false;
 				continue;
 			}
 
@@ -265,7 +261,7 @@ namespace parser_8859_15
 			// Not a problem for non-top-level objects since these will have
 			// nonzero openBraces anyway.
 			// But don't continue if the object was all on one line.
-			if (topLevel && !opened)
+			if (isTopLevel && !opened)
 			{
 				continue;
 			}
@@ -334,7 +330,7 @@ namespace parser_8859_15
 	{
 		//LOG(LogLevel::Debug) << "Setting LHS : " << key;
 
-		Object* p = new Object(Utils::convertUTF16ToUTF8(key));
+		shared_ptr<Object> p = make_shared<Object>(Utils::convertUTF16ToUTF8(key));
 		if (0 == stack.size())
 		{
 			topLevel->setValue(p);
@@ -348,7 +344,7 @@ namespace parser_8859_15
 		inObjList = true;
 		//LOG(LogLevel::Debug) << "Pushing objlist";
 		string key("objlist");			// the key of the object list
-		Object* p = new Object(key);	// the object to hold the object list
+		shared_ptr<Object> p = make_shared<Object>(key);	// the object to hold the object list
 		p->setObjList();
 		objstack.push_back(p);
 	}
@@ -356,17 +352,17 @@ namespace parser_8859_15
 	void setRHSleaf(wstring val)
 	{
 		//LOG(LogLevel::Debug) << "Setting RHSleaf : " << val;
-		Object* l = stack.back();	// the leaf object
+		shared_ptr<Object> l = stack.back();	// the leaf object
 		stack.pop_back();
 		l->setValue(Utils::convertUTF16ToUTF8(val));
 		if ((!inObjList) && (0 < stack.size()))
 		{
-			Object* p = stack.back();	// the object holding the leaf
+			shared_ptr<Object> p = stack.back();	// the object holding the leaf
 			p->setValue(l);
 		}
 		else if ((inObjList) && (0 < objstack.size()))
 		{
-			Object* p = objstack.back();	// the object holding the leaf
+			shared_ptr<Object> p = objstack.back();	// the object holding the leaf
 			p->setValue(l);
 		}
 	}
@@ -380,17 +376,17 @@ namespace parser_8859_15
 			utf8Vals.push_back(Utils::convertUTF16ToUTF8(val));
 		}
 
-		Object* l = stack.back();	// the object holding the list
+		shared_ptr<Object> l = stack.back();	// the object holding the list
 		stack.pop_back();
 		l->addToList(utf8Vals.begin(), utf8Vals.end());
 		if ((!inObjList) && (0 < stack.size()))
 		{
-			Object* p = stack.back();	// the object holding the leaf
+			shared_ptr<Object> p = stack.back();	// the object holding the leaf
 			p->setValue(l);
 		}
 		else if ((inObjList) && (0 < objstack.size()))
 		{
-			Object* p = objstack.back();	// the object holding the leaf
+			shared_ptr<Object> p = objstack.back();	// the object holding the leaf
 			p->setValue(l);
 		}
 	}
@@ -399,16 +395,16 @@ namespace parser_8859_15
 	{
 		//LOG(LogLevel::Debug) << "Setting RHSobject";
 		// No value is set, a bunch of leaves have been defined.
-		Object* l = stack.back();
+		shared_ptr<Object> l = stack.back();
 		stack.pop_back();
 		if ((!inObjList) && (0 < stack.size()))
 		{
-			Object* p = stack.back();	// the object holding the leaf
+			shared_ptr<Object> p = stack.back();	// the object holding the leaf
 			p->setValue(l);
 		}
 		else if ((inObjList) && (0 < objstack.size()))
 		{
-			Object* p = objstack.back();	// the object holding the leaf
+			shared_ptr<Object> p = objstack.back();	// the object holding the leaf
 			p->setValue(l);
 		}
 	}
@@ -417,13 +413,13 @@ namespace parser_8859_15
 	{
 		inObjList = false;
 		//LOG(LogLevel::Debug) << "Setting RHSobjlist";
-		Object* l = stack.back();	// the object
+		shared_ptr<Object> l = stack.back();	// the object
 		l->setValue(objstack);
 		objstack.clear();
 		stack.pop_back();
 		if (0 < stack.size())
 		{
-			Object* p = stack.back(); // the other object
+			shared_ptr<Object> p = stack.back(); // the other object
 			p->setValue(l);
 		}
 	}
@@ -439,13 +435,13 @@ namespace parser_8859_15
 		//LOG(LogLevel::Debug) << "In assign";
 		if (epsilon)
 		{
-			Object* e = new Object("epsilon");
+			shared_ptr<Object> e = make_shared<Object>("epsilon");
 			stack.push_back(e);
 		}
 		epsilon = false;
 	}
 
-	Object* doParseFile(string filename)
+	shared_ptr<Object> doParseFile(string filename)
 	{
 // This switch is made to ensure no problems arise with the other projects
 // While the Generic parser is still being tested it will only be used on Linux (where USE_GENERIC_PARADOX_PARSER is set to 1 by default)
@@ -460,17 +456,16 @@ namespace parser_8859_15
 		*/
 
 		initParser();
-		Object* obj = getTopLevel();	// the top level object
 		ifstream read(filename);
 		if (!read.is_open())
 		{
-			return nullptr;
+			return {};
 		}
 		readFile(read);
 		read.close();
 		read.clear();
 
-		return obj;
+		return topLevel;
 #endif
 	}
 } // namespace parser_8859_15
