@@ -28,6 +28,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.*/
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <unordered_set>
 #include <vector>
 using namespace std;
@@ -69,17 +70,18 @@ class provinceMapper
 		}
 		provinceMapper();
 
+		provinceMapper(const provinceMapper&) = delete;
+		provinceMapper& operator=(const provinceMapper&) = delete;
 
 		void initProvinceMap(shared_ptr<Object> parsedMappingsFile);
 		vector<shared_ptr<Object>> getCorrectMappingVersion(const vector<shared_ptr<Object>>& versions);
 		void processMappings(const vector<shared_ptr<Object>>& mappings);
-		vector<int> getHoI4ProvinceNums(int v2ProvinceNum);
 		void insertIntoHoI4ToVic2ProvinceMap(const vector<int>& Vic2Nums, const vector<int>& HoI4nums);
 		void insertIntoVic2ToHoI4ProvinceMap(const vector<int>& Vic2Nums, const vector<int>& HoI4nums);
 
-		void checkAllHoI4ProvinesMapped();
-		int getNextProvinceNumFromFile(ifstream& definitions);
-		void verifyProvinceIsMapped(int provNum);
+		void checkAllHoI4ProvinesMapped() const;
+		optional<int> getNextProvinceNumFromFile(ifstream& definitions) const;
+		void verifyProvinceIsMapped(int provNum) const;
 
 		HoI4ToVic2ProvinceMapping HoI4ToVic2ProvinceMap;
 		Vic2ToHoI4ProvinceMapping Vic2ToHoI4ProvinceMap;

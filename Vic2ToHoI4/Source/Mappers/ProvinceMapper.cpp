@@ -35,17 +35,21 @@ provinceMapper* provinceMapper::instance = NULL;
 
 
 
-provinceMapper::provinceMapper()
+provinceMapper::provinceMapper():
+	HoI4ToVic2ProvinceMap(),
+	Vic2ToHoI4ProvinceMap()
 {
 	LOG(LogLevel::Info) << "Parsing province mappings";
-	shared_ptr<Object> parsedMappingsFile = parser_8859_15::doParseFile("province_mappings.txt");
-	if (parsedMappingsFile == NULL)
+	auto parsedMappingsFile = parser_8859_15::doParseFile("province_mappings.txt");
+	if (parsedMappingsFile)
+	{
+		initProvinceMap(parsedMappingsFile);
+	}
+	else
 	{
 		LOG(LogLevel::Error) << "Could not parse file province_mappings.txt";
 		exit(-1);
 	}
-
-	initProvinceMap(parsedMappingsFile);
 }
 
 
@@ -127,7 +131,7 @@ void provinceMapper::insertIntoVic2ToHoI4ProvinceMap(const vector<int>& Vic2Nums
 }
 
 
-void provinceMapper::checkAllHoI4ProvinesMapped()
+void provinceMapper::checkAllHoI4ProvinesMapped() const
 {
 	ifstream definitions(Configuration::getHoI4Path() + "/map/definition.csv");
 	if (!definitions.is_open())
@@ -138,20 +142,20 @@ void provinceMapper::checkAllHoI4ProvinesMapped()
 
 	while (true)
 	{
-		int provNum = getNextProvinceNumFromFile(definitions);
-		if (provNum == -1)
+		auto provNum = getNextProvinceNumFromFile(definitions);
+		if (!provNum)
 		{
 			break;
 		}
 
-		verifyProvinceIsMapped(provNum);
+		verifyProvinceIsMapped(*provNum);
 	}
 
 	definitions.close();
 }
 
 
-int provinceMapper::getNextProvinceNumFromFile(ifstream& definitions)
+optional<int> provinceMapper::getNextProvinceNumFromFile(ifstream& definitions) const
 {
 	string line;
 	getline(definitions, line);
@@ -162,12 +166,12 @@ int provinceMapper::getNextProvinceNumFromFile(ifstream& definitions)
 	}
 	else
 	{
-		return -1;
+		return {};
 	}
 }
 
 
-void provinceMapper::verifyProvinceIsMapped(int provNum)
+void provinceMapper::verifyProvinceIsMapped(int provNum) const
 {
 	if (provNum != 0)
 	{
@@ -194,20 +198,4 @@ vector<shared_ptr<Object>> provinceMapper::getCorrectMappingVersion(const vector
 
 	LOG(LogLevel::Debug) << "Using version " << versions[versions.size() - 1]->getKey() << " mappings";
 	return versions[versions.size() - 1]->getLeaves();
-}
-
-
-vector<int> provinceMapper::getHoI4ProvinceNums(const int v2ProvinceNum)
-{
-	static const vector<int> empty_vec;	// an empty vector in case there are no equivalent V2 province numbers
-
-	auto itr = Vic2ToHoI4ProvinceMap.find(v2ProvinceNum);
-	if (itr == Vic2ToHoI4ProvinceMap.end())
-	{
-		return empty_vec;
-	}
-	else
-	{
-		return itr->second;
-	}
 }

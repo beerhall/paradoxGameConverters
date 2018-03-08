@@ -38,19 +38,21 @@ reformMapper* reformMapper::instance = nullptr;
 
 
 
-reformMapper::reformMapper()
+reformMapper::reformMapper():
+	reformTypes(),
+	politicalReformScores(),
+	socialReformScores(),
+	totalPoliticalReforms(0),
+	totalSocialReforms(0),
+	reformsInitialized(false)
 {
-	reformsInitialized		= false;
-	totalPoliticalReforms	= 0;
-	totalSocialReforms		= 0;
-
 	LOG(LogLevel::Info) << "Parsing governments reforms";
 	for (auto itr : Configuration::getVic2Mods())
 	{
 		if (Utils::DoesFileExist(Configuration::getV2Path() + "/mod/" + itr + "/common/issues.txt"))
 		{
 			auto obj = parser_8859_15::doParseFile((Configuration::getV2Path() + "/mod/" + itr + "/common/issues.txt"));
-			if (obj != nullptr)
+			if (obj)
 			{
 				initReforms(obj);
 				break;
@@ -59,10 +61,15 @@ reformMapper::reformMapper()
 	}
 	if (!reformsInitialized)
 	{
-		auto obj = parser_8859_15::doParseFile((Configuration::getV2Path() + "/common/issues.txt"));
-		if (obj != nullptr)
+		auto obj = parser_8859_15::doParseFile(Configuration::getV2Path() + "/common/issues.txt");
+		if (obj)
 		{
 			initReforms(obj);
+		}
+		else
+		{
+			LOG(LogLevel::Error) << "Could not parse " << Configuration::getV2Path() << "/common/issues.txt";
+			exit(-1);
 		}
 	}
 }
